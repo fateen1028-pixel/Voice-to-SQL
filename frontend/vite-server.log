@@ -1,0 +1,106 @@
+
+> frontend@0.1.0 dev
+> vite --host 127.0.0.1 --port 3000
+
+Port 3000 is in use, trying another one...
+
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m1493[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m3001[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m7:23:00 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:23:03 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=422175f9-d905-4c8d-adbf-0c49f227d477[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:26:53 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/Chat/ChatArea.tsx, /src/index.css[22m
+[2m7:26:57 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:26:59 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:27:34 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=422175f9-d905-4c8d-adbf-0c49f227d477[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:28:51 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:29:31 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:34:33 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:35:40 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=422175f9-d905-4c8d-adbf-0c49f227d477[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:35:42 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=422175f9-d905-4c8d-adbf-0c49f227d477[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:10 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:12 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:15 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:17 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:20 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:29 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:36:56 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=422175f9-d905-4c8d-adbf-0c49f227d477[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:37:22 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/Chat/ChatArea.tsx, /src/index.css[22m
+[2m7:37:22 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:37:27 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:37:30 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:37:55 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=a10b9c9e-e99e-47aa-957b-82bad90b2ebf[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:38:18 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:38:42 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:40:20 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m7:41:07 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:41:09 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:42:31 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/schema[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:42:41 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/history?conversation_id=d9815762-cbf7-47df-ae58-b669f696dd7d[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
