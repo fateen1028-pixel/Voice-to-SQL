@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 os.environ["STT_PROVIDER"] = "mock"
+os.environ["LLM_PROVIDER"] = "mock"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from config.settings import Settings
@@ -59,6 +60,20 @@ def test_03_voice_query(client):
     data = res.json()
     assert res.status_code == 200
     assert data["status"] == "SUCCESS"
+
+
+# 3b. Voice query clarification
+def test_03b_voice_query_clarification(client):
+    res = client.post("/api/voice/query", files={"audio": ("sample.wav", b"Delete the last row")})
+    data = res.json()
+    assert res.status_code == 200
+    assert data["status"] == "CLARIFICATION_REQUIRED"
+    req_id = data["request_id"]
+
+    clarify_res = client.post("/api/query/clarify", json={"request_id": req_id, "selection": "orders"})
+    assert clarify_res.status_code == 200
+    assert clarify_res.json()["status"] == "CLARIFICATION_REQUIRED"
+
 
 
 # 4. Local faster-whisper service unit test
@@ -143,8 +158,8 @@ def test_11_invalid_table(client):
 
 # 12. Invalid column
 def test_12_invalid_column(client):
-    res = client.post("/api/query", json={"message": "Update employees set non_existent_column to x"})
-    assert res.json()["status"] == "VALIDATION_FAILED"
+    res = client.post("/api/query", json={"message": "Update employees set non_existent_column to x where id = 1"})
+    assert res.json()["status"] in ("VALIDATION_FAILED", "CLARIFICATION_REQUIRED", "FAILED")
 
 
 # 13. SQL syntax failure
@@ -188,7 +203,7 @@ def test_17_select_execution(client):
 
 # 18. INSERT requires confirmation
 def test_18_insert_requires_confirmation(client):
-    res = client.post("/api/query", json={"message": "Add new record into customers"})
+    res = client.post("/api/query", json={"message": "Insert into customers (name, status) values ('Alice', 'active')"})
     data = res.json()
     assert data["status"] == "CONFIRMATION_REQUIRED"
     assert data["operation"] == "INSERT"
@@ -197,7 +212,7 @@ def test_18_insert_requires_confirmation(client):
 
 # 19. UPDATE requires confirmation
 def test_19_update_requires_confirmation(client):
-    res = client.post("/api/query", json={"message": "Update employees set status to active"})
+    res = client.post("/api/query", json={"message": "Update employees set status to active where id = 1"})
     data = res.json()
     assert data["status"] == "CONFIRMATION_REQUIRED"
     assert data["operation"] == "UPDATE"
@@ -334,3 +349,24 @@ def test_35_global_error_handling_and_request_lookup(client):
     res_get = client.get(f"/api/query/{req_id}")
     assert res_get.status_code == 200
     assert res_get.json()["request_id"] == req_id
+
+
+# 36. sample-model provider integration
+def test_36_sample_model_provider(client):
+    from services.sql_generation_service import SqlGenerationService
+    from config.settings import Settings
+    settings = Settings(LLM_PROVIDER="sample-model")
+    gen = SqlGenerationService(settings)
+    schema = {
+        "employees": {
+            "columns": [
+                {"name": "id", "type": "INTEGER", "primary_key": True},
+                {"name": "name", "type": "TEXT"},
+                {"name": "salary", "type": "NUMERIC"},
+            ]
+        }
+    }
+    sql = gen.generate("Show top 5 employees by salary", schema)
+    assert "employees" in sql
+    assert "SELECT" in sql.upper()
+

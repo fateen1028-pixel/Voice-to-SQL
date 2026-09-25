@@ -12,7 +12,7 @@ class Settings(BaseSettings):
         description="Database connection URL for PostgreSQL or SQLite",
     )
     cors_origins_raw: str = Field(
-        default="",
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",
         description="Comma-separated list of allowed CORS origins",
     )
@@ -80,6 +80,16 @@ class Settings(BaseSettings):
         default=3,
         alias="MAX_REPAIR_ATTEMPTS",
         description="Maximum automatic SQL repair retry attempts",
+    )
+    confirmation_ttl_seconds: int = Field(
+        default=300,
+        alias="CONFIRMATION_TTL_SECONDS",
+        description="TTL expiration in seconds for pending execution tokens (default 5 min)",
+    )
+    max_mutation_rows: int = Field(
+        default=1000,
+        alias="MAX_MUTATION_ROWS",
+        description="Maximum permitted estimated affected rows for UPDATE/DELETE mutations",
     )
 
     @property

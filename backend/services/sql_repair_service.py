@@ -53,13 +53,22 @@ class SqlRepairService:
                 if yr_match:
                     yr = yr_match.group(1)
                     next_yr = str(int(yr) + 1)
-                    # Replace >= '2025-01-01' with >= '2025-01-01' AND date < '2026-01-01'
+                    col_match = re.search(rf"([a-z0-9_]+)\s*>=\s*'{yr}-01-01'", repaired, re.IGNORECASE)
+                    date_col = col_match.group(1) if col_match else None
+                    if not date_col and schema:
+                        for meta in schema.values():
+                            d_col = next((c["name"] for c in meta.get("columns", []) if any(term in c["name"].lower() for term in ("date", "created", "joined", "timestamp"))), None)
+                            if d_col:
+                                date_col = d_col
+                                break
+                    date_col = date_col or "created_at"
                     repaired = re.sub(
                         rf"(>=\s*'{yr}-01-01')",
-                        rf"\1 AND joined_date < '{next_yr}-01-01'",
+                        rf"\1 AND {date_col} < '{next_yr}-01-01'",
                         repaired,
                         flags=re.IGNORECASE,
                     )
+
 
             # Repair missing LIMIT for top-N
             if "missing a LIMIT clause" in issue or "requires a LIMIT" in issue:

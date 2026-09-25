@@ -13,8 +13,14 @@ class VisualizationService:
 
         # Find category column (string/date) and numeric column (int/float)
         sample = rows[0]
-        numeric_cols = [c for c in columns if isinstance(sample.get(c), (int, float))]
-        category_cols = [c for c in columns if isinstance(sample.get(c), str)]
+        # Exclude ID columns from numeric chart metrics (id, customer_id, department_id, etc.)
+        numeric_cols = [
+            c for c in columns
+            if isinstance(sample.get(c), (int, float))
+            and c.lower() != "id"
+            and not c.lower().endswith("_id")
+        ]
+        category_cols = [c for c in columns if isinstance(sample.get(c), str) and c.lower() != "id" and not c.lower().endswith("_id")]
         date_cols = [c for c in category_cols if any(d_kw in c.lower() for d_kw in ("date", "year", "month", "day", "created", "time"))]
 
         if not numeric_cols:

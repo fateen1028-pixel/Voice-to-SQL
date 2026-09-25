@@ -10,81 +10,85 @@ def inspect_schema(database: Database) -> dict[str, dict]:
 
 def _inspect_postgres(database: Database) -> dict[str, dict]:
     tables: dict[str, dict] = {}
-    cursor = database.cursor()
+    try:
+        cursor = database.cursor()
 
-    # Retrieve all public user tables
-    cursor.execute("""
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-          AND table_type = 'BASE TABLE'
-    """)
-    table_rows = cursor.fetchall()
-    table_names = [row["table_name"] for row in table_rows]
-
-    for table in table_names:
-        # Columns metadata
+        # Retrieve all public user tables
         cursor.execute("""
-            SELECT column_name, data_type, is_nullable
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s
-            ORDER BY ordinal_position
-        """, (table,))
-        col_rows = cursor.fetchall()
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+              AND table_type = 'BASE TABLE'
+        """)
+        table_rows = cursor.fetchall()
+        table_names = [row["table_name"] for row in table_rows]
 
-        # Primary keys
-        cursor.execute("""
-            SELECT kcu.column_name
-            FROM information_schema.table_constraints tc
-            JOIN information_schema.key_column_usage kcu
-              ON tc.constraint_name = kcu.constraint_name
-             AND tc.table_schema = kcu.table_schema
-            WHERE tc.constraint_type = 'PRIMARY KEY'
-              AND tc.table_schema = 'public'
-              AND tc.table_name = %s
-        """, (table,))
-        pk_cols = {row["column_name"] for row in cursor.fetchall()}
+        for table in table_names:
+            # Columns metadata
+            cursor.execute("""
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                ORDER BY ordinal_position
+            """, (table,))
+            col_rows = cursor.fetchall()
 
-        columns = []
-        for c in col_rows:
-            columns.append({
-                "name": c["column_name"],
-                "type": c["data_type"].upper(),
-                "nullable": c["is_nullable"] == "YES",
-                "primary_key": c["column_name"] in pk_cols,
-            })
+            # Primary keys
+            cursor.execute("""
+                SELECT kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                 AND tc.table_schema = kcu.table_schema
+                WHERE tc.constraint_type = 'PRIMARY KEY'
+                  AND tc.table_schema = 'public'
+                  AND tc.table_name = %s
+            """, (table,))
+            pk_cols = {row["column_name"] for row in cursor.fetchall()}
 
-        # Foreign keys
-        cursor.execute("""
-            SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
-            FROM information_schema.table_constraints AS tc
-            JOIN information_schema.key_column_usage AS kcu
-              ON tc.constraint_name = kcu.constraint_name
-             AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage AS ccu
-              ON ccu.constraint_name = tc.constraint_name
-             AND ccu.table_schema = tc.table_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND tc.table_schema = 'public'
-              AND tc.table_name = %s
-        """, (table,))
-        fk_rows = cursor.fetchall()
-        foreign_keys = [
-            {
-                "column": fk["column_name"],
-                "foreign_table": fk["foreign_table_name"],
-                "foreign_column": fk["foreign_column_name"],
+            columns = []
+            for c in col_rows:
+                columns.append({
+                    "name": c["column_name"],
+                    "type": c["data_type"].upper(),
+                    "nullable": c["is_nullable"] == "YES",
+                    "primary_key": c["column_name"] in pk_cols,
+                })
+
+            # Foreign keys
+            cursor.execute("""
+                SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                 AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                 AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = 'public'
+                  AND tc.table_name = %s
+            """, (table,))
+            fk_rows = cursor.fetchall()
+            foreign_keys = [
+                {
+                    "column": fk["column_name"],
+                    "foreign_table": fk["foreign_table_name"],
+                    "foreign_column": fk["foreign_column_name"],
+                }
+                for fk in fk_rows
+            ]
+
+            tables[table] = {
+                "columns": columns,
+                "foreign_keys": foreign_keys,
+                "indexes": [],
             }
-            for fk in fk_rows
-        ]
 
-        tables[table] = {
-            "columns": columns,
-            "foreign_keys": foreign_keys,
-            "indexes": [],
-        }
-
-    return tables
+        return tables
+    except Exception:
+        database.rollback()
+        raise
 
 
 def _inspect_sqlite(database: Database) -> dict[str, dict]:

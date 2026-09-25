@@ -49,6 +49,13 @@ class Database:
             except Exception:
                 pass
 
+    def rollback(self) -> None:
+        if self.connection:
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+
     def cursor(self) -> typing.Any:
         if not self.connection:
             raise RuntimeError("Database connection is not initialized.")
