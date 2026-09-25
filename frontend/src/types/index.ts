@@ -56,6 +56,7 @@ export interface QueryRequest {
   message: string;
   conversation_id?: string;
   user_role?: string;
+  language?: string;
 }
 
 export interface ClarifyRequest {

@@ -12,6 +12,7 @@ async def voice_query(
     audio: UploadFile = File(...),
     conversation_id: str | None = Form(default=None),
     user_role: str | None = Form(default="user"),
+    language: str | None = Form(default=None),
 ) -> dict:
     session_id = request.headers.get("X-Session-ID") or request.headers.get("x-session-id")
     conversations = request.app.state.conversations
@@ -23,9 +24,10 @@ async def voice_query(
         raise HTTPException(503, str(exc))
 
     if not transcript or (confidence is not None and confidence < settings.stt_confidence_threshold):
+        is_ta = (language == "ta")
         return {
             "status": "RETRY_REQUIRED",
-            "message": "Can't understand, please say again.",
+            "message": "பேசியது புரியவில்லை, தயவுசெய்து மீண்டும் கூறவும்." if is_ta else "Can't understand, please say again.",
         }
 
     prior_sql = conversations.get_last_sql(conversation_id)
@@ -50,6 +52,7 @@ async def voice_query(
             user_role=user_role or pending_intent.user_role or "user",
             input_type="voice",
             intent=updated_intent,
+            language=language,
         )
     else:
         res = await asyncio.to_thread(
@@ -61,6 +64,7 @@ async def voice_query(
             active_context_table=active_table,
             user_role=user_role or "user",
             input_type="voice",
+            language=language,
         )
 
     if isinstance(res, dict):

@@ -71,7 +71,7 @@ export async function queryDatabase(payload: QueryRequest): Promise<ApiResponse>
 /**
  * Execute natural language voice query via audio recording upload
  */
-export async function voiceQuery(audioBlob: Blob, conversationId?: string): Promise<ApiResponse> {
+export async function voiceQuery(audioBlob: Blob, conversationId?: string, language?: string): Promise<ApiResponse> {
   const formData = new FormData();
   const mimeType = audioBlob.type.toLowerCase();
   const extension = mimeType.includes('webm')
@@ -85,6 +85,9 @@ export async function voiceQuery(audioBlob: Blob, conversationId?: string): Prom
   formData.append('audio', audioBlob, `speech.${extension}`);
   if (conversationId) {
     formData.append('conversation_id', conversationId);
+  }
+  if (language) {
+    formData.append('language', language);
   }
 
   const controller = new AbortController();

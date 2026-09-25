@@ -5,6 +5,7 @@ class QueryRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000, description="Natural language query string.")
     conversation_id: str | None = Field(default=None, max_length=128, description="Optional conversation identifier.")
     user_role: str | None = Field(default="user", max_length=64, description="Optional user role for permission evaluation.")
+    language: str | None = Field(default=None, max_length=16, description="Optional language preference ('en' or 'ta').")
 
 
 class ClarifyRequest(BaseModel):

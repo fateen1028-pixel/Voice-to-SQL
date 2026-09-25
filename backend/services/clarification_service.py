@@ -10,34 +10,45 @@ class ClarificationService:
         self.database = database
 
     def build_clarification(
-        self, intent: StructuredIntent, missing_slot: str, schema: dict[str, dict] | None = None
+        self, intent: StructuredIntent, missing_slot: str, schema: dict[str, dict] | None = None, language: str = "en"
     ) -> tuple[str, str, list[Any]]:
         if not schema:
             schema = inspect_schema(self.database)
 
         field = missing_slot
+        is_ta = (language == "ta") or (intent.raw_message and any("\u0b80" <= char <= "\u0bff" for char in intent.raw_message))
 
         # 0. Missing Operation
         if missing_slot == "operation":
-            question = "Data va enna panna virumbureenga?"
-            options = ["Data paaka (View)", "Pudhu data saerkka (Add)", "Data maatha (Update)", "Data neekka (Delete)"]
+            if is_ta:
+                question = "தரவை (data) என்ன செய்ய விரும்புகிறீர்கள்?"
+                options = ["தரவைப் பார்க்க (View)", "புதிய தரவைச் சேர்க்க (Add)", "தரவை மாற்ற (Update)", "தரவை நீக்க (Delete)"]
+            else:
+                question = "What would you like to do with the data?"
+                options = ["View data", "Add data", "Update data", "Delete data"]
             return question, field, options
 
         # Missing Required Column Value
         if missing_slot.startswith("field:"):
             col_name = missing_slot.split(":", 1)[1]
             table = intent.table or "target table"
-            question = f"{table} table la intha record kku {col_name} enna podanum?"
+            if is_ta:
+                question = f"{table} அட்டவணையில் இந்த பதிவிற்கு {col_name} என்ன பயன்படுத்தப்பட வேண்டும்?"
+            else:
+                question = f"What {col_name} should be used for this record in the {table} table?"
             options = []
             return question, field, options
 
         # 1. Missing Table
         if missing_slot == "table":
             msg_lower = intent.raw_message.lower()
-            if "last" in msg_lower or intent.target == "last row":
-                question = f"Endha table la irundhu last row va {intent.operation.lower()} pannanum?"
+            if is_ta:
+                question = f"எந்த அட்டவணையைப் (table) பயன்படுத்தி {intent.operation} செய்ய விரும்புகிறீர்கள்?"
             else:
-                question = f"Endha table ah {intent.operation.lower()} panna virumbureenga?"
+                if "last" in msg_lower or intent.target == "last row":
+                    question = f"Which table should I {intent.operation.lower()} the last row from?"
+                else:
+                    question = f"Which table would you like to {intent.operation.lower()}?"
 
             table_names = sorted(list(schema.keys()))
             options = table_names[:10] if len(table_names) > 10 else table_names
@@ -49,7 +60,10 @@ class ClarificationService:
             cols = schema.get(table, {}).get("columns", []) if schema else []
 
             target_name = intent.target or "last row"
-            question = f"{table} table la '{target_name}' kku edhu moolama sort pannanum?"
+            if is_ta:
+                question = f"{table} அட்டவணையில் '{target_name}' எதன் மூலம் வரிசைப்படுத்தப்பட வேண்டும்?"
+            else:
+                question = f"What should '{target_name}' mean for the {table} table?"
 
             options: list[str] = []
             entity = table[:-1] if table.endswith("s") else table
@@ -59,12 +73,20 @@ class ClarificationService:
             created_col = next((c["name"] for c in cols if any(term in c["name"].lower() for term in ("created", "joined", "timestamp", "date", "inserted"))), None)
             updated_col = next((c["name"] for c in cols if any(term in c["name"].lower() for term in ("updated", "modified"))), None)
 
-            if id_col:
-                options.append(f"Highest {entity} ID")
-            if created_col:
-                options.append("Most recently created")
-            if updated_col:
-                options.append("Most recently updated")
+            if is_ta:
+                if id_col:
+                    options.append(f"உயர்ந்த {entity} ID")
+                if created_col:
+                    options.append("சமீபத்தில் உருவாக்கப்பட்டது")
+                if updated_col:
+                    options.append("சமீபத்தில் புதுப்பிக்கப்பட்டது")
+            else:
+                if id_col:
+                    options.append(f"Highest {entity} ID")
+                if created_col:
+                    options.append("Most recently created")
+                if updated_col:
+                    options.append("Most recently updated")
 
             # Fallback numeric/date columns in table
             if len(options) < 2:
@@ -88,7 +110,10 @@ class ClarificationService:
             target = intent.target or "items"
             table = intent.table
 
-            question = f"'{target}' kku endha metric moolama calculate pannanum?"
+            if is_ta:
+                question = f"'{target}' எதன் மூலம் கணக்கிடப்பட வேண்டும்?"
+            else:
+                question = f"What metric defines '{target}'?"
             options: list[str] = []
 
             if table and table in schema:
@@ -135,12 +160,14 @@ class ClarificationService:
             deduped = [opt for opt in options if not (opt in seen or seen.add(opt))]
             return question, field, deduped[:5]
 
-
         # 4. Missing Filter Definition
         if missing_slot == "filter_definition":
             target = intent.target or "records"
             table = intent.table or "table"
-            question = f"{table} table la '{target}' kku endha condition filter pannanum?"
+            if is_ta:
+                question = f"{table} அட்டவணையில் '{target}' எந்த நிபந்தனை மூலம் வடிகட்டப்பட வேண்டும்?"
+            else:
+                question = f"How should '{target}' be defined for the {table} table?"
             cols = schema.get(table, {}).get("columns", []) if schema and table in schema else []
 
             options = []
@@ -158,7 +185,9 @@ class ClarificationService:
 
             return question, field, options
 
-        return f"Requirement puriyala, intha slot ({missing_slot}) ah clarify pannunga.", field, ["Option 1", "Option 2"]
+        if is_ta:
+            return f"விடுபட்ட விவரத்தை ({missing_slot}) தெளிவுபடுத்தவும்.", field, ["விருப்பம் 1", "விருப்பம் 2"]
+        return f"Could you clarify the missing information ({missing_slot})?", field, ["Option 1", "Option 2"]
 
     def generate_options(self, term: str, schema: dict[str, dict] | None = None) -> tuple[str, list[str]]:
         intent = StructuredIntent(operation="SELECT", target=term, raw_message=term)

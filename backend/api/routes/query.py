@@ -33,6 +33,7 @@ async def query(payload: QueryRequest, request: Request) -> dict:
             user_role=payload.user_role or pending_intent.user_role or "user",
             input_type="text",
             intent=updated_intent,
+            language=payload.language,
         )
     else:
         result = await asyncio.to_thread(
@@ -44,6 +45,7 @@ async def query(payload: QueryRequest, request: Request) -> dict:
             active_context_table=active_table,
             user_role=payload.user_role or "user",
             input_type="text",
+            language=payload.language,
         )
 
     if result.get("status") == "CLARIFICATION_REQUIRED":

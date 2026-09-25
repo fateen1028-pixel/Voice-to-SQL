@@ -56,8 +56,11 @@ class QueryService:
         user_role: str | None = "user",
         input_type: str = "text",
         intent: Any | None = None,
+        language: str | None = None,
     ) -> dict:
         request_id = str(uuid4())
+        is_ta = (language == "ta") or any("\u0b80" <= char <= "\u0bff" for char in message)
+        lang_code = "ta" if is_ta else "en"
 
         # 1. Layered Prompt Injection Defense
         if self.intent.is_prompt_injection(message):
@@ -66,7 +69,7 @@ class QueryService:
                 "status": "SECURITY_VIOLATION",
                 "request_id": request_id,
                 "audit_id": audit_id,
-                "message": "Request blocked by security firewall: Potential prompt injection detected.",
+                "message": "பாதுகாப்புக் கொள்கை மீறல்: சாத்தியமான தப்பான கோரிக்கை தடுக்கப்பட்டது." if is_ta else "Request blocked by security firewall: Potential prompt injection detected.",
             }
 
         # 2. Extract & Evaluate Structured Intent Completeness
@@ -76,7 +79,7 @@ class QueryService:
 
         if not intent.is_complete:
             missing_slot = intent.missing_slots[0]
-            question, field, options = self.clarification.build_clarification(intent, missing_slot, schema_dict)
+            question, field, options = self.clarification.build_clarification(intent, missing_slot, schema_dict, language=lang_code)
             audit_id = self.audit.log(request_id, input_type, message, None, "CLARIFICATION_REQUIRED", user_role=user_role)
             return {
                 "status": "CLARIFICATION_REQUIRED",
@@ -172,7 +175,7 @@ class QueryService:
                 "rows": rows,
                 "row_count": len(rows),
                 "validation": val,
-                "explanation": self.results.explain(rows, message),
+                "explanation": self.results.explain(rows, message, language=lang_code),
                 "visualization": self.visualization.recommend(columns, rows),
             }
 
@@ -233,9 +236,9 @@ class QueryService:
             self.pending_executions[token] = pending
 
         if operation == "DELETE":
-            msg = f"🚨 DELETE OPERATION: Intha action records ah permanent ah delete pannum. Execute panna confirm pannunga."
+            msg = "🚨 நீக்குதல் செயல்பாடு: இந்த செயல்பாடு பதிவுகளை நிரந்தரமாக நீக்கும். செயல்படுத்துவதற்கு முன் உறுதிப்படுத்தவும்." if is_ta else "🚨 DELETE OPERATION: This action will permanently delete records. Please confirm before execution."
         else:
-            msg = f"Intha operation database records ah modify pannum ({operation}). Execute panna confirm pannunga."
+            msg = f"இந்த செயல்பாடு தரவுத்தள பதிவுகளை மாற்றும் ({operation}). செயல்படுத்துவதற்கு முன் உறுதிப்படுத்தவும்." if is_ta else f"This operation will modify database records ({operation}). Please confirm before execution."
 
         audit_id = self.audit.log(request_id, input_type, message, sql, "CONFIRMATION_REQUIRED", user_role=user_role)
         return {
@@ -311,12 +314,15 @@ class QueryService:
             }
 
         self.audit.log(pending.request_id, "confirm", pending.sql, pending.sql, "SUCCESS", affected_rows=affected, user_role=effective_role)
+        is_ta = (pending.structured_intent and pending.structured_intent.raw_message and any("\u0b80" <= char <= "\u0bff" for char in pending.structured_intent.raw_message))
+        msg_success = f"{pending.operation} செயல்பாடு வெற்றிகரமாக செய்யப்பட்டது. {affected} பதிவு(கள்) பாதிக்கப்பட்டடன." if is_ta else f"Successfully executed {pending.operation}. {affected} record(s) affected."
+
         return {
             "status": "SUCCESS",
             "sql": pending.sql,
             "operation": pending.operation,
             "row_count": affected,
-            "message": f"{pending.operation} operation success ah execute aaiduchu. {affected} record(s) affect aachu.",
+            "message": msg_success,
         }
 
     def _verify_intent_sql_consistency(self, intent: StructuredIntent, sql: str, schema: dict[str, dict]) -> str | None:

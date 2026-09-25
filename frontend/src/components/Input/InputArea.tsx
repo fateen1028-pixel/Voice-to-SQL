@@ -118,7 +118,7 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
         try {
           const mimeType = mediaRecorder.mimeType || 'audio/webm';
           const audioBlob = new Blob(chunks.current, { type: mimeType });
-          const result = await submitVoiceQuery(audioBlob, conversationId);
+          const result = await submitVoiceQuery(audioBlob, conversationId, lang === 'ta-IN' ? 'ta' : 'en');
 
           if (result.transcript) {
             setText('');
