@@ -15,6 +15,7 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
   const [text, setText] = useState('');
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [lang, setLang] = useState<'en-US' | 'ta-IN'>('en-US');
   const recorder = useRef<MediaRecorder | null>(null);
   const recognitionRef = useRef<any>(null);
   const latestTranscriptRef = useRef<string>('');
@@ -62,7 +63,7 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        recognition.lang = lang;
 
         recognition.onresult = (event: any) => {
           let transcript = '';
@@ -180,6 +181,14 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
           disabled={disabled}
           onClick={toggleVoice}
         />
+        <button
+          type="button"
+          className="px-2 py-1 text-xs rounded-lg font-medium bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700 transition-colors"
+          onClick={() => setLang((l) => (l === 'en-US' ? 'ta-IN' : 'en-US'))}
+          title="Switch Voice Language (English / Tamil)"
+        >
+          {lang === 'en-US' ? 'EN' : 'தமிழ்'}
+        </button>
         <button
           className="send-button"
           onClick={submit}

@@ -233,9 +233,9 @@ class QueryService:
             self.pending_executions[token] = pending
 
         if operation == "DELETE":
-            msg = f"🚨 DELETE OPERATION: This action will permanently delete records. Please confirm before execution."
+            msg = f"🚨 DELETE OPERATION: Intha action records ah permanent ah delete pannum. Execute panna confirm pannunga."
         else:
-            msg = f"This operation will modify database records ({operation}). Please confirm before execution."
+            msg = f"Intha operation database records ah modify pannum ({operation}). Execute panna confirm pannunga."
 
         audit_id = self.audit.log(request_id, input_type, message, sql, "CONFIRMATION_REQUIRED", user_role=user_role)
         return {
@@ -316,7 +316,7 @@ class QueryService:
             "sql": pending.sql,
             "operation": pending.operation,
             "row_count": affected,
-            "message": f"Successfully executed {pending.operation}. {affected} record(s) affected.",
+            "message": f"{pending.operation} operation success ah execute aaiduchu. {affected} record(s) affect aachu.",
         }
 
     def _verify_intent_sql_consistency(self, intent: StructuredIntent, sql: str, schema: dict[str, dict]) -> str | None:

@@ -156,7 +156,7 @@ class LocalWhisperSpeechToTextService(BaseSpeechToTextService):
                         "contents": [{
                             "parts": [
                                 {"inlineData": {"mimeType": mime, "data": b64}},
-                                {"text": "Transcribe this spoken voice query accurately into plain English text. Output ONLY the transcribed query without punctuation or quotes."}
+                                {"text": "Transcribe this spoken voice query accurately into plain text (supports English, Tamil, and Tanglish). Output ONLY the transcribed query without punctuation or quotes."}
                             ]
                         }],
                         "generationConfig": {"temperature": 0.0}

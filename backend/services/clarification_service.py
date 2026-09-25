@@ -19,15 +19,15 @@ class ClarificationService:
 
         # 0. Missing Operation
         if missing_slot == "operation":
-            question = "What would you like to do with the data?"
-            options = ["View data", "Add data", "Update data", "Delete data"]
+            question = "Data va enna panna virumbureenga?"
+            options = ["Data paaka (View)", "Pudhu data saerkka (Add)", "Data maatha (Update)", "Data neekka (Delete)"]
             return question, field, options
 
         # Missing Required Column Value
         if missing_slot.startswith("field:"):
             col_name = missing_slot.split(":", 1)[1]
             table = intent.table or "target table"
-            question = f"What {col_name} should be used for this record in the {table} table?"
+            question = f"{table} table la intha record kku {col_name} enna podanum?"
             options = []
             return question, field, options
 
@@ -35,9 +35,9 @@ class ClarificationService:
         if missing_slot == "table":
             msg_lower = intent.raw_message.lower()
             if "last" in msg_lower or intent.target == "last row":
-                question = f"Which table should I {intent.operation.lower()} the last row from?"
+                question = f"Endha table la irundhu last row va {intent.operation.lower()} pannanum?"
             else:
-                question = f"Which table would you like to {intent.operation.lower()}?"
+                question = f"Endha table ah {intent.operation.lower()} panna virumbureenga?"
 
             table_names = sorted(list(schema.keys()))
             options = table_names[:10] if len(table_names) > 10 else table_names
@@ -49,7 +49,7 @@ class ClarificationService:
             cols = schema.get(table, {}).get("columns", []) if schema else []
 
             target_name = intent.target or "last row"
-            question = f"What should '{target_name}' mean for the {table} table?"
+            question = f"{table} table la '{target_name}' kku edhu moolama sort pannanum?"
 
             options: list[str] = []
             entity = table[:-1] if table.endswith("s") else table
@@ -88,7 +88,7 @@ class ClarificationService:
             target = intent.target or "items"
             table = intent.table
 
-            question = f"What metric defines '{target}'?"
+            question = f"'{target}' kku endha metric moolama calculate pannanum?"
             options: list[str] = []
 
             if table and table in schema:
@@ -140,7 +140,7 @@ class ClarificationService:
         if missing_slot == "filter_definition":
             target = intent.target or "records"
             table = intent.table or "table"
-            question = f"How should '{target}' be defined for the {table} table?"
+            question = f"{table} table la '{target}' kku endha condition filter pannanum?"
             cols = schema.get(table, {}).get("columns", []) if schema and table in schema else []
 
             options = []
@@ -158,7 +158,7 @@ class ClarificationService:
 
             return question, field, options
 
-        return f"Could you clarify the missing information ({missing_slot})?", field, ["Option 1", "Option 2"]
+        return f"Requirement puriyala, intha slot ({missing_slot}) ah clarify pannunga.", field, ["Option 1", "Option 2"]
 
     def generate_options(self, term: str, schema: dict[str, dict] | None = None) -> tuple[str, list[str]]:
         intent = StructuredIntent(operation="SELECT", target=term, raw_message=term)

@@ -98,6 +98,7 @@ class SqlGenerationService:
         dialect = "PostgreSQL" if is_postgres else "SQLite"
 
         system_prompt = f"""You are a precise SQL generator for a {dialect} database.
+You support natural language queries in English, Tamil (தமிழ்), or Tanglish (Tamil in English script).
 Given the schema below, generate ONLY a valid executable SQL query responding to the user's request.
 Do NOT surround with backticks or extra text.
 Do NOT invent tables or columns outside the schema.

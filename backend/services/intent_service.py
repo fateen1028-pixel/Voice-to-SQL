@@ -142,14 +142,26 @@ class IntentService:
 
     def _resolve_operation(self, normalized: str, context_table: str | None = None) -> str:
         # Check meta / capability questions
-        if any(p in normalized for p in ("what can you do", "what operations", "how to use", "what are options", "help")):
+        if any(p in normalized for p in ("what can you do", "what operations", "how to use", "what are options", "help", "என்ன செய்ய முடியும்")):
             return "AMBIGUOUS"
 
-        # Check explicit verb groups
-        has_delete = bool(re.search(r"\b(delete|remove|erase|purge)\b", normalized))
-        has_update = bool(re.search(r"\b(update|change|modify|set|increase|decrease|adjust|rename)\b", normalized))
-        has_insert = bool(re.search(r"\b(insert|add|create|register|store|put|make\s+.*\s+a\s+member)\b", normalized))
-        has_select = bool(re.search(r"\b(show|list|get|view|find|how\s+many|which|display|fetch|search|count|top|best)\b", normalized))
+        # Check explicit verb groups (English + Day-to-Day Spoken Tamil + Tanglish)
+        has_delete = bool(
+            re.search(r"\b(delete|remove|erase|purge|neekku|azhi|thookku|thookidunga|thooki|azhichidu|azhichidunga)\b", normalized)
+        ) or any(w in normalized for w in ("நீக்கு", "அழி", "நீக்கவும்", "அழிக்கவும்", "தூக்கு", "தூக்குங்க", "தூக்கிடுங்க", "தூக்கி", "அழிச்சிடு", "அழிச்சிடுங்க"))
+
+        has_update = bool(
+            re.search(r"\b(update|change|modify|set|increase|decrease|adjust|rename|maatru|puthuppi|maathividu|maathividunga|maathu|maathunga|thiruthu)\b", normalized)
+        ) or any(w in normalized for w in ("மாற்று", "புதுப்பி", "மாற்றவும்", "மாத்து", "மாத்துங்க", "மாத்திவிடு", "மாத்திவிடுங்க"))
+
+        has_insert = bool(
+            re.search(r"\b(insert|add|create|register|store|put|make\s+.*\s+a\s+member|saer|saerka|podu|podunga|serthudu|serthudunga|saerthu|ullidu)\b", normalized)
+        ) or any(w in normalized for w in ("சேர்", "சேர்க்க", "சேர்க்கவும்", "சேரு", "உள்ளிடு", "போடு", "போடுங்க", "சேர்த்துடு", "சேர்த்துடுங்க", "சேர்த்து", "சேர்த்துவிடு"))
+
+        has_select = bool(
+            re.search(r"\b(show|list|get|view|find|how\s+many|which|display|fetch|search|count|top|best|kaatu|kaattunga|kaanum|kudu|kudunga|eduthukko|thedu|edu|evlo|evalo|ethana|yavlo|yaaru)\b", normalized)
+        ) or any(w in normalized for w in ("காட்டு", "காட்டுங்க", "காண்பி", "எடு", "பட்டியலிடு", "தேடு", "பார்ப்போம்", "குடு", "குடுங்க", "எடுத்துக்கோ", "எவ்வளவு", "எத்தனை", "யாரு", "எந்த"))
+
         if re.search(r"\bwhat\b\s+(is|are|was|were|total|average|sum|max|min|count|the)\b", normalized):
             has_select = True
 
@@ -162,7 +174,7 @@ class IntentService:
         if has_select:
             return "SELECT"
 
-        # Check secondary patterns (e.g. "add ... to", "new ...")
+        # Check secondary patterns (e.g. "add ... to", "new ...", Tamil additions)
         if re.search(r"\badd\b.*\b(to|into)\b", normalized) or re.search(r"\bnew\s+(record|row|user|customer|employee|student|product|order|item)\b", normalized):
             return "INSERT"
 
@@ -178,49 +190,90 @@ class IntentService:
         cols = table_schema.get("columns", [])
         extracted: dict[str, Any] = {}
 
-        # Isolate the SET portion of the text before any WHERE clause
         set_text_norm = normalized.split(" where ", 1)[0] if " where " in normalized else normalized
         set_text_raw = raw.split(" where ", 1)[0] if " where " in normalized.lower() else raw
 
+        # Dynamic Tamil / Tanglish transliteration dictionary for schema column roots
+        col_transliterations = {
+            "name": ("பெயர்", "பெயரை", "பெயரு", "name", "title"),
+            "location": ("லொகேஷன்", "இடம்", "இருப்பிடம்", "location", "loc", "city"),
+            "email": ("மின்னஞ்சல்", "ஈமெயில்", "மெயில்", "email", "mail"),
+            "phone": ("தொலைபேசி", "போன்", "மொபைல்", "phone", "mobile", "contact"),
+            "salary": ("சம்பளம்", "ஊதியம்", "salary", "pay", "income", "wage"),
+            "role": ("பதவி", "பொறுப்பு", "வேலை", "role", "designation", "position"),
+            "status": ("நிலை", "ஸ்டேட்டஸ்", "status", "state"),
+            "date": ("தேதி", "நாள்", "date", "joined", "created"),
+            "address": ("முகவரி", "அட்ரஸ்", "address"),
+            "city": ("நகரம்", "சிட்டி", "city"),
+            "department": ("டிபார்ட்மென்ட்", "டிபார்ட்மென்ட்ட", "department", "dept"),
+        }
+
+        # 1. Dynamic Noun Marker Extraction: `<value> ங்கிற/என்கிற/என்ற/nu/enra <target>`
+        # Example: "science ங்கிற டிபார்ட்மென்ட்ட" -> value="science" for name/department_name column
+        noun_marker_matches = re.findall(
+            r"([A-Za-z0-9_]+)\s*(?:ங்கிற|என்கிற|என்ற|enra|nu|இன்கிற)\s*([A-Za-z0-9_அ-ஹஃா-்]+)",
+            set_text_raw,
+            re.I,
+        )
+        for val_found, target_found in noun_marker_matches:
+            t_low = target_found.lower()
+            val_clean = val_found.strip()
+            for c in cols:
+                c_name = c["name"]
+                c_low = c_name.lower()
+                is_name_col = any(term in c_low for term in ("name", "title", "label"))
+                target_matches_table_or_col = (
+                    c_low in t_low or t_low in c_low or "department" in t_low or "டிபார்ட்மென்ட்" in t_low or "table" in t_low or "record" in t_low
+                )
+                if is_name_col and target_matches_table_or_col and c_name not in extracted:
+                    extracted[c_name] = val_clean
+
+        # 2. Dynamic Pattern Extraction for every column in the table schema
         for c in cols:
             c_name = c["name"]
             c_name_low = c_name.lower()
+            if c_name in extracted:
+                continue
 
-            role_synonyms = ("role", "designation", "job_title", "role_name", "position")
-            salary_synonyms = ("salary", "compensation", "pay", "remuneration", "wage")
-            name_synonyms = ("name", "full_name", "staff_name", "employee_name", "employee", "customer_name", "customer")
+            short_col = c_name_low.replace("_id", "").replace("_name", "").replace("_date", "").replace("_address", "")
+            search_terms = [c_name_low, short_col]
+            for term, trans_list in col_transliterations.items():
+                if term in c_name_low or c_name_low in term:
+                    search_terms.extend(trans_list)
 
-            # Salary extraction
-            if c_name_low in salary_synonyms or any(s in c_name_low for s in salary_synonyms):
-                sal_match = re.search(r"\b(?:salary|compensation|pay|wage|remuneration)\b(?:\s+(?:of|to|=|:))?\s*['\"]?\$?\s*([\d,]+(?:\.\d+)?)\b", set_text_norm)
-                if sal_match:
-                    num_str = sal_match.group(1).replace(",", "")
-                    try:
-                        extracted[c_name] = int(float(num_str)) if float(num_str).is_integer() else float(num_str)
-                    except ValueError:
-                        extracted[c_name] = sal_match.group(1)
+            # Search `<col_term> [is|=|to|:] <value>` or `<col_term> <value>`
+            for term in search_terms:
+                pat = (
+                    r"\b"
+                    + re.escape(term)
+                    + r"\b\s*(?:=|\bis\b|to|:|இருக்கு|ஆன|வந்துகிட்டு|வந்து)?\s*['\"]?([A-Za-z0-9_.@%+-]+|[A-Za-z0-9_\u0B80-\u0BFF]+)['\"]?"
+                )
+                match = re.search(pat, set_text_raw, re.I)
+                if match:
+                    val = match.group(1).strip()
+                    val = re.sub(r"[\sலஇல்]+$", "", val).strip()
+                    if val and val.lower() not in (c_name_low, "table", "database", "record", "row", "data", "departments"):
+                        extracted[c_name] = int(val) if val.isdigit() else val
+                        break
 
-            # Role extraction
-            if c_name_low in role_synonyms or any(s in c_name_low for s in role_synonyms):
-                role_match = re.search(r"\b(?:role|designation|position|job_title|role_name)\b(?:\s+(?:of|to|=|:))?\s*['\"]?([a-zA-Z0-9_\s-]+?)['\"]?(?:\s+with|\s+to|\s+for|\s+in|\s*$)", set_text_raw, re.I)
-                if role_match:
-                    extracted[c_name] = role_match.group(1).strip()
-
-            # Name / Entity Name extraction
-            if c_name_low in name_synonyms or any(s in c_name_low for s in name_synonyms):
-                name_match = re.search(r"\b(?:employee|customer|student|user|staff|member|person|name|full_name)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b", set_text_raw)
-                if not name_match:
-                    name_match = re.search(r"\b(?:name|full_name)\s*(?:is|=|to|:)?\s*['\"]?([A-Za-z\s]{2,30})['\"]?", set_text_raw, re.I)
-                if name_match:
-                    val = name_match.group(1).strip()
-                    if val.lower() not in ("table", "database", "record", "row", "data", "role", "salary", "dancer"):
-                        extracted[c_name] = val
-
-            # Generic `col = val` or `col to val` matching for schema column names in set_text
-            gen_match = re.search(r"\b" + re.escape(c_name_low) + r"\b\s*(?:=|\bis\b|to|:)\s*['\"]?([\w@.-]+)['\"]?", set_text_norm)
-            if gen_match and c_name not in extracted:
-                val = gen_match.group(1)
-                extracted[c_name] = int(val) if val.isdigit() else val
+            # 3. Dynamic Format Extractors (Email, Phone, Number/Salary, Date)
+            if c_name not in extracted:
+                if any(t in c_name_low for t in ("email", "mail")):
+                    em = re.search(r"\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b", set_text_norm)
+                    if em:
+                        extracted[c_name] = em.group(1)
+                elif any(t in c_name_low for t in ("phone", "mobile", "contact", "cell")):
+                    pm = re.search(r"\b(\+?\d[\d\s-]{7,15}\d)\b", set_text_norm)
+                    if pm:
+                        extracted[c_name] = pm.group(1).replace(" ", "").replace("-", "")
+                elif any(t in c_name_low for t in ("salary", "pay", "wage", "income", "compensation")):
+                    sm = re.search(r"\b(?:salary|compensation|pay|wage|remuneration|income|சம்பளம்)\b(?:\s+(?:of|is|to|=|:))?\s*['\"]?\$?\s*([\d,]+(?:\.\d+)?)\b", set_text_norm)
+                    if sm:
+                        num_str = sm.group(1).replace(",", "")
+                        try:
+                            extracted[c_name] = int(float(num_str)) if float(num_str).is_integer() else float(num_str)
+                        except ValueError:
+                            extracted[c_name] = sm.group(1)
 
         return extracted
 
@@ -397,11 +450,24 @@ class IntentService:
 
     def _match_table(self, text: str, schema: dict[str, dict]) -> str | None:
         words = set(re.findall(r"\b\w+\b", text.lower()))
+        text_lower = text.lower()
+
+        tamil_table_map = {
+            "employees": ("ஊழியர்", "ஊழியர்கள்", "பணியாளர்", "பணியாளர்கள்", "வேலைஆட்கள்", "oozhiyar", "paniyaalar"),
+            "customers": ("வாடிக்கையாளர்", "வாடிக்கையாளர்கள்", "vaadikkaiyaalar"),
+            "orders": ("ஆர்டர்", "ஆர்டர்கள்", "வாங்குதல்", "ஆர்டரை"),
+            "products": ("தயாரிப்பு", "பொருட்கள்", "பண்டங்கள்"),
+        }
+
         for table in schema:
             t_lower = table.lower()
             t_sing = t_lower.rstrip("s")
             if t_lower in words or t_sing in words:
                 return table
+            syns = tamil_table_map.get(t_lower, ())
+            if any(syn in text_lower for syn in syns):
+                return table
+
         for table, meta in schema.items():
             col_names = [c["name"].lower() for c in meta.get("columns", [])]
             if any(w in col_names for w in words if len(w) > 2):
