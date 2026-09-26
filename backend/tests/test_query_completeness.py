@@ -43,9 +43,15 @@ def client():
                     joined_date TEXT
                 );
 
+                CREATE TABLE departments (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT
+                );
+
                 INSERT INTO customers VALUES (1, 'Alice', 'active', '2025-01-01', '2025-01-02'), (2, 'Bob', 'inactive', '2025-01-03', '2025-01-04');
                 INSERT INTO orders VALUES (101, 1, 150.0, '2025-02-01', '2025-02-01'), (102, 1, 250.0, '2025-02-05', '2025-02-06');
                 INSERT INTO employees VALUES (1, 'Charlie', 'active', 60000, '2025-03-01');
+                INSERT INTO departments VALUES (4, 'Engineering');
             """)
             conn.commit()
             yield test_client
@@ -152,3 +158,13 @@ def test_adversarial_vague_queries(client, query):
     # Must NOT generate un-clarified SQL or show CONFIRMATION_REQUIRED directly!
     assert data["status"] in ("CLARIFICATION_REQUIRED", "FAILED")
     assert data["status"] != "CONFIRMATION_REQUIRED"
+
+
+def test_delete_id_no_4_in_departments_table(client):
+    res = client.post("/api/query", json={"message": "can you delete id no 4 in the departments table"})
+    data = res.json()
+    # Must directly extract ID 4 and ask for confirmation (since DELETE is mutation), with NO clarification loop!
+    assert data["status"] == "CONFIRMATION_REQUIRED"
+    assert "departments" in data["sql"].lower()
+    assert "id = 4" in data["sql"].lower() or "id=4" in data["sql"].lower() or "id = '4'" in data["sql"].lower() or "id='4'" in data["sql"].lower()
+

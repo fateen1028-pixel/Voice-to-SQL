@@ -24,43 +24,84 @@ export function ChatArea() {
   const [conversationId] = useState(() => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2));
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pipelineStep, setPipelineStep] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
+  const [autoInvokeTrigger, setAutoInvokeTrigger] = useState(0);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [turns, busy]);
+  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [turns, busy, pendingMessage, pipelineStep]);
 
   const append = useCallback((message: string, response: ApiResponse) => {
     setTurns((current) => [...current, { id: response.request_id ?? crypto.randomUUID?.() ?? String(Date.now()), message, response }]);
+    if (
+      response.status === 'CLARIFICATION_REQUIRED' ||
+      response.status === 'CONFIRMATION_REQUIRED' ||
+      response.status === 'RETRY_REQUIRED'
+    ) {
+      setAutoInvokeTrigger((prev) => prev + 1);
+    }
   }, []);
 
   const ask = useCallback(async (message: string) => {
     setNotice(null);
+    setPendingMessage(message);
     setBusy(true);
+    setPipelineStep(1);
+    const timer = setTimeout(() => setPipelineStep(2), 650);
+
     try {
-      append(message, await submitQuery({ message, conversation_id: conversationId }));
+      const response = await submitQuery({ message, conversation_id: conversationId });
+      append(message, response);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Your request could not be sent.');
     } finally {
+      clearTimeout(timer);
       setBusy(false);
+      setPendingMessage(null);
     }
   }, [append, conversationId]);
 
   const handleClarify = useCallback(async (requestId: string, option: string) => {
-    setBusy(true); setNotice(null);
-    try { append(option, await submitClarification({ request_id: requestId, selection: option })); }
-    catch (error) { setNotice(error instanceof Error ? error.message : 'The clarification could not be sent.'); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setPendingMessage(option);
+    setNotice(null);
+    setPipelineStep(1);
+    const timer = setTimeout(() => setPipelineStep(2), 650);
+
+    try {
+      const response = await submitClarification({ request_id: requestId, selection: option });
+      append(option, response);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'The clarification could not be sent.');
+    } finally {
+      clearTimeout(timer);
+      setBusy(false);
+      setPendingMessage(null);
+    }
   }, [append]);
 
   const handleConfirm = useCallback(async (token: string) => {
-    setBusy(true); setNotice(null);
-    try { append('Confirm this change', await confirmMutation({ confirmation_token: token })); }
-    catch (error) { setNotice(error instanceof Error ? error.message : 'The change could not be confirmed.'); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setPendingMessage('Confirm this change');
+    setNotice(null);
+    setPipelineStep(1);
+    const timer = setTimeout(() => setPipelineStep(2), 650);
+
+    try {
+      const response = await confirmMutation({ confirmation_token: token });
+      append('Confirm this change', response);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'The change could not be confirmed.');
+    } finally {
+      clearTimeout(timer);
+      setBusy(false);
+      setPendingMessage(null);
+    }
   }, [append]);
 
   const toggleHistory = useCallback(async () => {
@@ -91,8 +132,8 @@ export function ChatArea() {
         </div>
       </header>
 
-      <main className={turns.length ? 'workspace workspace-active' : 'workspace'} aria-live="polite">
-        {turns.length === 0 ? (
+      <main className={turns.length || busy ? 'workspace workspace-active' : 'workspace'} aria-live="polite">
+        {turns.length === 0 && !busy ? (
           <section className="welcome">
             <span className="welcome-mark"><VoiceQlMark /></span>
             <h1>What do you need to know?</h1>
@@ -104,7 +145,39 @@ export function ChatArea() {
               <div className="user-question">{turn.message}</div>
               <QueryResult response={turn.response} onClarify={handleClarify} onConfirm={handleConfirm} onRetry={() => ask(turn.message)} />
             </article>)}
-            {busy && <div className="processing"><span className="processing-dot" />Working with your request</div>}
+            {busy && pendingMessage && (
+              <article className="turn turn-pending">
+                <div className="user-question">{pendingMessage}</div>
+                <div className="pipeline-loader-card">
+                  <div className="pipeline-header">
+                    <span className="mini-spinner" />
+                    <span>Processing Query Pipeline</span>
+                  </div>
+                  <div className="pipeline-steps">
+                    <div className="pipeline-step step-completed">
+                      <span className="step-badge check">✓</span>
+                      <span>Grounding schema & inspecting metadata</span>
+                    </div>
+                    <div className={`pipeline-step ${pipelineStep >= 2 ? 'step-completed' : 'step-active'}`}>
+                      {pipelineStep >= 2 ? (
+                        <span className="step-badge check">✓</span>
+                      ) : (
+                        <span className="step-badge spin" />
+                      )}
+                      <span>Constructing & validating SQL query</span>
+                    </div>
+                    <div className={`pipeline-step ${pipelineStep >= 2 ? 'step-active' : 'step-pending'}`}>
+                      {pipelineStep >= 2 ? (
+                        <span className="step-badge spin" />
+                      ) : (
+                        <span className="step-badge dot">•</span>
+                      )}
+                      <span>Evaluating security rules & executing request</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )}
           </section>
         )}
         {notice && <div className="notice" role="alert"><span>{notice}</span><button onClick={() => setNotice(null)} aria-label="Dismiss message">{icon('M6 6l12 12M18 6 6 18')}</button></div>}
@@ -112,7 +185,7 @@ export function ChatArea() {
         <div ref={endRef} />
       </main>
 
-      <footer className="composer-wrap"><InputArea disabled={busy} conversationId={conversationId} onSubmit={ask} onVoiceResult={(message, response) => append(message, response)} onError={setNotice} /></footer>
+      <footer className="composer-wrap"><InputArea disabled={busy} conversationId={conversationId} autoInvokeTrigger={autoInvokeTrigger} onSubmit={ask} onVoiceResult={(message, response) => append(message, response)} onError={setNotice} /></footer>
       <SchemaPanel isOpen={schemaOpen} onClose={() => setSchemaOpen(false)} loadSchema={fetchSchema} />
     </div>
   );

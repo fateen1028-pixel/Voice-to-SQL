@@ -5,6 +5,15 @@ from model.query_models import StructuredIntent
 from services.clarification_service import ClarificationService
 
 
+NUMBER_WORDS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+    "ஒன்று": 1, "இரண்டு": 2, "மூன்று": 3, "நான்கு": 4, "ஐந்து": 5, "ஆறு": 6, "ஏழு": 7, "எட்டு": 8, "ஒன்பது": 9, "பத்து": 10,
+    "ஒன்னாவது": 1, "ரெண்டாவது": 2, "மூணாவது": 3, "நாலாவது": 4, "அஞ்சாவது": 5, "ஆறாவது": 6, "ஏழாவது": 7, "எட்டாவது": 8, "ஒன்பதாவது": 9, "பத்தாவது": 10
+}
+
+
 class IntentService:
     def __init__(self, clarification_service: ClarificationService) -> None:
         self.clarification_service = clarification_service
@@ -105,19 +114,40 @@ class IntentService:
         # WHERE filter parsing
         filter_column = None
         filter_value = None
-        where_match = re.search(r"\bwhere\s+(\w+)\s*(=|is|like)\s*['\"]?(\w+)['\"]?", normalized)
-        if where_match:
-            filter_column = where_match.group(1)
-            filter_value = where_match.group(3)
-        elif matched_table:
-            table_cols = schema.get(matched_table, {}).get("columns", [])
-            status_col = next((c["name"] for c in table_cols if any(term in c["name"].lower() for term in ("status", "active", "state", "condition", "flag"))), None)
-            if status_col:
-                for word in ("inactive", "active", "pending", "completed", "cancelled", "archived"):
-                    if word in normalized:
-                        filter_column = status_col
-                        filter_value = word
-                        break
+
+        # A. Dynamic ID / Primary Key number & number-word extraction
+        id_match = re.search(
+            r"\b(?:(?:[a-z0-9_]+\s+)?id|record|row|ஐடி)\s*(?:no\.?|num\.?|number|நம்பர்|=|#|:)?\s*([a-zA-Z0-9_\u0B80-\u0BFF]+)\b",
+            normalized,
+        )
+        if id_match and matched_table and matched_table in schema:
+            raw_id_val = id_match.group(1).lower()
+            parsed_id = None
+            if raw_id_val.isdigit():
+                parsed_id = int(raw_id_val)
+            elif raw_id_val in NUMBER_WORDS:
+                parsed_id = NUMBER_WORDS[raw_id_val]
+
+            if parsed_id is not None:
+                table_cols = schema[matched_table].get("columns", [])
+                pk_col = next((c["name"] for c in table_cols if c.get("primary_key") or c["name"].lower() in ("id", f"{matched_table.rstrip('s')}_id")), "id")
+                filter_column = pk_col
+                filter_value = parsed_id
+
+        if not filter_column:
+            where_match = re.search(r"\bwhere\s+(\w+)\s*(=|is|like)\s*['\"]?(\w+)['\"]?", normalized)
+            if where_match:
+                filter_column = where_match.group(1)
+                filter_value = where_match.group(3)
+            elif matched_table:
+                table_cols = schema.get(matched_table, {}).get("columns", [])
+                status_col = next((c["name"] for c in table_cols if any(term in c["name"].lower() for term in ("status", "active", "state", "condition", "flag"))), None)
+                if status_col:
+                    for word in ("inactive", "active", "pending", "completed", "cancelled", "archived"):
+                        if word in normalized:
+                            filter_column = status_col
+                            filter_value = word
+                            break
 
         intent = StructuredIntent(
             operation=operation,
@@ -208,6 +238,36 @@ class IntentService:
             "department": ("டிபார்ட்மென்ட்", "டிபார்ட்மென்ட்ட", "department", "dept"),
         }
 
+        # 0. English Explicit Entity Name Extractor (e.g. "department named science", "named Charlie", "employee Michael Jackson")
+        named_match = re.search(
+            r"\b(?:named|called|name\s+is|named\s+as|called\s+as|with\s+name|with\s+the\s+name)\s+['\"]?([A-Za-z0-9_.-]+(?:\s+[A-Za-z0-9_.-]+)*|[\u0B80-\u0BFF]+)['\"]?",
+            set_text_raw,
+            re.I,
+        )
+        for c in cols:
+            c_name = c["name"]
+            c_low = c_name.lower()
+            is_name_col = any(term in c_low for term in ("name", "full_name", "title", "label")) or c_low.endswith("_name")
+            if is_name_col and c_name not in extracted:
+                if named_match:
+                    val_candidate = named_match.group(1).strip()
+                    val_words = []
+                    for w in val_candidate.split():
+                        if w.lower() in ("with", "for", "in", "at", "location", "salary", "role", "dept"):
+                            break
+                        val_words.append(w)
+                    if val_words:
+                        extracted[c_name] = " ".join(val_words)
+                else:
+                    name_m = re.search(
+                        r"\b(?:employee|customer|user|person|named|name)\s+([A-Z][a-zA-Z0-9_]*(?:\s+[A-Z][a-zA-Z0-9_]*)*)\b",
+                        set_text_raw,
+                    )
+                    if name_m:
+                        val_candidate = name_m.group(1).strip()
+                        if val_candidate.lower() not in ("table", "database", "record", "row", "data"):
+                            extracted[c_name] = val_candidate
+
         # 1. Dynamic Noun Marker Extraction: `<value> ங்கிற/என்கிற/என்ற/nu/enra <target>`
         # Example: "science ங்கிற டிபார்ட்மென்ட்ட" -> value="science" for name/department_name column
         noun_marker_matches = re.findall(
@@ -235,6 +295,14 @@ class IntentService:
             if c_name in extracted:
                 continue
 
+            # DO NOT extract string values into autoincrement / primary key ID columns
+            is_pk_id = c.get("primary_key") or c_name_low == "id" or c_name_low.endswith("_id")
+            if is_pk_id:
+                pk_num_m = re.search(r"\b" + re.escape(c_name_low) + r"\s*(?:=|\bis\b|:)?\s*(\d+)\b", set_text_norm)
+                if pk_num_m:
+                    extracted[c_name] = int(pk_num_m.group(1))
+                continue
+
             short_col = c_name_low.replace("_id", "").replace("_name", "").replace("_date", "").replace("_address", "")
             search_terms = [c_name_low, short_col]
             for term, trans_list in col_transliterations.items():
@@ -242,18 +310,30 @@ class IntentService:
                     search_terms.extend(trans_list)
 
             # Search `<col_term> [is|=|to|:] <value>` or `<col_term> <value>`
+            ignored_words = {
+                "of", "for", "a", "an", "the", "as", "is", "to", "with", "in", "by", "on", "at", "from", "and", "or",
+                "table", "database", "record", "row", "data", "departments", "employees", "customers", "orders", "products"
+            }
             for term in search_terms:
                 pat = (
                     r"\b"
                     + re.escape(term)
-                    + r"\b\s*(?:=|\bis\b|to|:|இருக்கு|ஆன|வந்துகிட்டு|வந்து)?\s*['\"]?([A-Za-z0-9_.@%+-]+|[A-Za-z0-9_\u0B80-\u0BFF]+)['\"]?"
+                    + r"\b(?:\s+(?:=|\bis\b|\bto\b|\bof\b|\bfor\b|\bas\b|:|\bwith\b|இருக்கு|ஆன|வந்துகிட்டு|வந்து))*\s*['\"]?([A-Za-z0-9_.,@%+-]+(?:\s+[A-Za-z0-9_.,@%+-]+)*|[\u0B80-\u0BFF]+)['\"]?"
                 )
                 match = re.search(pat, set_text_raw, re.I)
                 if match:
                     val = match.group(1).strip()
                     val = re.sub(r"[\sலஇல்]+$", "", val).strip()
-                    if val and val.lower() not in (c_name_low, "table", "database", "record", "row", "data", "departments"):
-                        extracted[c_name] = int(val) if val.isdigit() else val
+                    # Strip out trailing keywords if regex matched into next clause
+                    clean_words = []
+                    for w in val.split():
+                        if w.lower() in ("with", "for", "to", "and", "in", "where", "with a", "a"):
+                            break
+                        clean_words.append(w)
+                    val = " ".join(clean_words).strip()
+                    val_num = val.replace(",", "")
+                    if val and val.lower() not in ignored_words and val.lower() not in (c_name_low, short_col):
+                        extracted[c_name] = int(val_num) if val_num.isdigit() else val
                         break
 
             # 3. Dynamic Format Extractors (Email, Phone, Number/Salary, Date)
@@ -322,6 +402,8 @@ class IntentService:
                 missing.append("ordering_definition")
             elif intent.filter_column and intent.filter_value:
                 pass
+            elif intent.resolved_slots.get("filter_definition") or intent.resolved_slots.get("all_records"):
+                pass
             elif has_ambiguous_pronoun:
                 # "Delete that" / "Delete those" requires explicit target filter definition
                 missing.append("filter_definition")
@@ -333,12 +415,12 @@ class IntentService:
         elif intent.operation == "UPDATE":
             if not intent.set_columns and "set" not in raw_lower:
                 missing.append("set_columns")
-            if not intent.filter_column and not intent.filter_value and "where" not in raw_lower and "all" not in raw_lower:
+            if not intent.filter_column and not intent.filter_value and "where" not in raw_lower and "all" not in raw_lower and not intent.resolved_slots.get("filter_definition") and not intent.resolved_slots.get("all_records"):
                 missing.append("filter_definition")
 
         elif intent.operation == "SELECT":
             subj_terms = ("best", "biggest", "largest", "sales", "top", "worst", "popular")
-            if any(term in (intent.target or "") for term in subj_terms) or any(term in intent.vague_terms for term in subj_terms):
+            if any(term in (intent.target or "") for term in subj_terms) or any(term in intent.vague_terms for term in subj_terms) or any(term in raw_lower for term in subj_terms):
                 if not intent.metric and not intent.ordering_column and not intent.limit:
                     missing.append("metric")
 
@@ -351,6 +433,11 @@ class IntentService:
     ) -> StructuredIntent:
         selection_clean = selection.strip()
         selection_norm = selection_clean.lower()
+
+        new_op = self._resolve_operation(selection_norm)
+        starts_query_verb = any(selection_norm.startswith(verb) for verb in ("show ", "list ", "get ", "view ", "find ", "select ", "delete ", "remove ", "update ", "insert ", "add "))
+        if new_op in ("INSERT", "UPDATE", "DELETE") or starts_query_verb:
+            return self.extract_intent(selection, schema)
 
         if field == "operation":
             op_map = {
@@ -421,6 +508,8 @@ class IntentService:
                 if len(parts) == 2:
                     intent.filter_column = parts[0].strip()
                     intent.filter_value = parts[1].strip().strip("'\"")
+            if "all" in selection_norm or "everything" in selection_norm:
+                intent.resolved_slots["all_records"] = True
 
         self.analyze_completeness(intent, schema)
         return intent

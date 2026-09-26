@@ -164,10 +164,11 @@ class ClarificationService:
         if missing_slot == "filter_definition":
             target = intent.target or "records"
             table = intent.table or "table"
+            target_display = "records" if (not target or target.lower() == table.lower() or target.lower() == f"{table.lower()} table") else target
             if is_ta:
-                question = f"{table} அட்டவணையில் '{target}' எந்த நிபந்தனை மூலம் வடிகட்டப்பட வேண்டும்?"
+                question = f"{table} அட்டவணையில் '{target_display}' எந்த நிபந்தனை மூலம் வடிகட்டப்பட வேண்டும்?"
             else:
-                question = f"How should '{target}' be defined for the {table} table?"
+                question = f"How should '{target_display}' be defined for the {table} table?"
             cols = schema.get(table, {}).get("columns", []) if schema and table in schema else []
 
             options = []

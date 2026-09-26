@@ -243,13 +243,21 @@ Schema:
         if re.search(r"\b(insert|add|create)\b", text) and any(w in text for w in ("into", "new", "record", "customer", "employee", "order")):
             return self._insert(text, table, columns, schema)
 
-        # ID filter for SELECT: "id number N", "id N", "id = N", "record N", "row N"
-        id_match = re.search(r"\b(?:id\s*(?:number|=|#|:)?\s*|record\s*|row\s*)(\d+)\b", text)
+        # ID filter for SELECT: "id number N", "id N", "id = N", "record N", "row N", "id number seven"
+        num_words = {
+            "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+            "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+            "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+            "ஒன்று": 1, "இரண்டு": 2, "மூன்று": 3, "நான்கு": 4, "ஐந்து": 5, "ஆறு": 6, "ஏழு": 7, "எட்டு": 8, "ஒன்பது": 9, "பத்து": 10,
+        }
+        id_match = re.search(r"\b(?:id\s*(?:number|=|#|:)?\s*|record\s*|row\s*|ஐடி\s*(?:நம்பர்)?\s*)([a-zA-Z0-9_\u0B80-\u0BFF]+)\b", text)
         pk_col_name = next((c["name"] for c in schema[table]["columns"] if c.get("primary_key") or c["name"].lower() in ("id", f"{table.rstrip('s')}_id")), "id")
         if id_match and pk_col_name.lower() in columns:
-            pk_col = columns[pk_col_name.lower()]
-            pk_val = id_match.group(1)
-            return f"SELECT * FROM {table} WHERE {pk_col} = {pk_val}"
+            raw_val = id_match.group(1).lower()
+            pk_val = int(raw_val) if raw_val.isdigit() else num_words.get(raw_val)
+            if pk_val is not None:
+                pk_col = columns[pk_col_name.lower()]
+                return f"SELECT * FROM {table} WHERE {pk_col} = {pk_val}"
 
         # Dynamic aggregation/join for clarification selections
         if "highest" in text or "total" in text or "most" in text or "spending" in text:

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { submitVoiceQuery } from '@/api/client';
 import type { ApiResponse } from '@/types';
 import { MicrophoneButton } from './MicrophoneButton';
@@ -6,12 +6,13 @@ import { MicrophoneButton } from './MicrophoneButton';
 interface Props {
   conversationId: string;
   disabled: boolean;
+  autoInvokeTrigger?: number;
   onSubmit: (message: string) => Promise<void>;
   onVoiceResult: (message: string, response: ApiResponse) => void;
   onError: (message: string) => void;
 }
 
-export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, onError }: Props) {
+export function InputArea({ conversationId, disabled, autoInvokeTrigger, onSubmit, onVoiceResult, onError }: Props) {
   const [text, setText] = useState('');
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -21,10 +22,43 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
   const latestTranscriptRef = useRef<string>('');
   const chunks = useRef<Blob[]>([]);
   const stream = useRef<MediaStream | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (autoInvokeTrigger && autoInvokeTrigger > 0 && !recording && !transcribing && !disabled) {
+      const timer = setTimeout(() => {
+        toggleVoice();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoInvokeTrigger, disabled]);
 
   const releaseStream = () => {
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
+  };
+
+  const cancelVoice = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (_) {}
+      recognitionRef.current = null;
+    }
+    if (recorder.current) {
+      try {
+        recorder.current.onstop = null;
+        if (recorder.current.state !== 'inactive') {
+          recorder.current.stop();
+        }
+      } catch (_) {}
+      recorder.current = null;
+    }
+    releaseStream();
+    chunks.current = [];
+    latestTranscriptRef.current = '';
+    setRecording(false);
+    setTranscribing(false);
   };
 
   const submit = async () => {
@@ -81,14 +115,13 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
           setRecording(false);
         };
 
-        recognition.onend = async () => {
+        recognition.onend = () => {
           setRecording(false);
           recognitionRef.current = null;
           const finalSpokenText = latestTranscriptRef.current.trim();
           if (finalSpokenText) {
-            latestTranscriptRef.current = '';
-            setText('');
-            await onSubmit(finalSpokenText);
+            setText(finalSpokenText);
+            setTimeout(() => textareaRef.current?.focus(), 50);
           }
         };
 
@@ -121,10 +154,8 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
           const result = await submitVoiceQuery(audioBlob, conversationId, lang === 'ta-IN' ? 'ta' : 'en');
 
           if (result.transcript) {
-            setText('');
-            onVoiceResult(`🎤 ${result.transcript}`, result);
-          } else {
-            onVoiceResult('🎤 Voice Input', result);
+            setText(result.transcript);
+            setTimeout(() => textareaRef.current?.focus(), 50);
           }
         } catch (error) {
           onError(
@@ -161,6 +192,7 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
   return (
     <div className={`composer ${recording ? 'border-red-400 bg-red-50/10' : ''}`}>
       <textarea
+        ref={textareaRef}
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
@@ -181,6 +213,20 @@ export function InputArea({ conversationId, disabled, onSubmit, onVoiceResult, o
           disabled={disabled}
           onClick={toggleVoice}
         />
+        {(recording || transcribing) && (
+          <button
+            type="button"
+            className="px-2.5 py-1 text-xs rounded-lg font-medium bg-red-600/80 text-white hover:bg-red-600 transition-colors flex items-center gap-1"
+            onClick={cancelVoice}
+            title="Cancel transcribing"
+            aria-label="Cancel transcribing"
+          >
+            <svg aria-hidden="true" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Cancel</span>
+          </button>
+        )}
         <button
           type="button"
           className="px-2 py-1 text-xs rounded-lg font-medium bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700 transition-colors"

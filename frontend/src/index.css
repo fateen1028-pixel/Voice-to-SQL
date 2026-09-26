@@ -21,5 +21,14 @@ button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2
 .composer textarea::placeholder { color: #626262; }
 .mic-button { border-color: #9e9e9e; background: #ededed; }
 @keyframes breathe { 50% { transform: scale(1.06); opacity: .78; } } @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 640px) { .topbar { padding: 0 14px; }.workspace { padding: 20px 15px; }.workspace:not(.workspace-active) { padding-bottom: 80px; }.welcome h1 { font-size: 30px; }.welcome p { font-size: 15px; }.turn { padding: 16px 0 24px; }.user-question { max-width: 94%; }.composer-wrap { padding: 10px 12px max(14px, env(safe-area-inset-bottom)); }.composer { border-radius: 7px; }.composer textarea { font-size: 16px; }.caution-result, .error-result { padding: 13px; }.schema-panel { width: 92vw; padding: 18px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; } }
+.pipeline-loader-card { padding: 18px 20px; border: 1px solid #2a2a2a; border-radius: 14px; background: #0d0d0d; color: #e5e5e5; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; gap: 12px; }
+.pipeline-header { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px; border-bottom: 1px solid #1a1a1a; }
+.pipeline-steps { display: flex; flex-direction: column; gap: 10px; }
+.pipeline-step { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #888; transition: color 0.2s ease; }
+.pipeline-step.step-completed { color: #10b981; }
+.pipeline-step.step-active { color: #ffffff; font-weight: 500; }
+.step-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; }
+.step-badge.check { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.step-badge.spin { border: 2px solid #525252; border-top-color: #ffffff; border-radius: 50%; animation: spin 0.75s linear infinite; }
+.step-badge.dot { color: #525252; font-size: 16px; }
+
